@@ -16,7 +16,7 @@ type VerifyTokenRequest struct {
 
 type GenerateJWTRequest struct {
 	FirebaseToken string   `json:"firebase_token" binding:"required"`
-	OrganizationID string  `json:"organization_id" binding:"required"`
+	OrganizationID string  `json:"organization_id"` // No longer required, empty means all orgs
 	Permissions   []string `json:"permissions"`
 }
 
