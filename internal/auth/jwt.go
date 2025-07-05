@@ -17,10 +17,17 @@ func GenerateJWT(user models.User, orgID string, permissions []string, secret st
 	claims := jwt.MapClaims{
 		"uid":         user.UID,
 		"email":       user.Email,
-		"org_id":      orgID,
 		"permissions": permissions,
 		"exp":         expirationTime.Unix(),
 		"iat":         time.Now().Unix(),
+	}
+	
+	// Only add org_id to claims if it's not empty
+	if orgID != "" {
+		claims["org_id"] = orgID
+	} else {
+		// For empty org_id, explicitly set to empty string to indicate 'all organizations' access
+		claims["org_id"] = ""
 	}
 	
 	// Create token with claims

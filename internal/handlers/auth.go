@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -50,15 +51,29 @@ func VerifyToken(c *gin.Context) {
 
 // GenerateJWT creates a JWT token from a Firebase token
 func GenerateJWT(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "POST, OPTIONS")
+	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	// Handle preflight OPTIONS request
+	if c.Request.Method == "OPTIONS" {
+		c.Status(http.StatusOK)
+		return
+	}
+
 	var req GenerateJWTRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Log the request (without the full token for security)
+	log.Printf("GenerateJWT request received with organization_id: %s", req.OrganizationID)
+
 	// Verify the Firebase token
 	firebaseToken, err := auth.VerifyFirebaseToken(c, req.FirebaseToken)
 	if err != nil {
+		log.Printf("Failed to verify Firebase token: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Firebase token: " + err.Error()})
 		return
 	}
@@ -66,6 +81,7 @@ func GenerateJWT(c *gin.Context) {
 	// Get user information
 	firebaseUser, err := auth.GetUserByUID(c, firebaseToken.UID)
 	if err != nil {
+		log.Printf("Failed to get user: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user: " + err.Error()})
 		return
 	}
@@ -81,16 +97,24 @@ func GenerateJWT(c *gin.Context) {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
+		log.Printf("Failed to load configuration: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load configuration: " + err.Error()})
 		return
 	}
 
+	// Log JWT generation attempt
+	log.Printf("Generating JWT for user: %s, organization: %s", user.Email, req.OrganizationID)
+
 	// Generate JWT
 	token, err := auth.GenerateJWT(user, req.OrganizationID, req.Permissions, cfg.JWTSecret, cfg.JWTExpiration)
 	if err != nil {
+		log.Printf("Failed to generate JWT: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT: " + err.Error()})
 		return
 	}
+
+	// Log success
+	log.Printf("JWT generated successfully for user: %s", user.Email)
 
 	// Return the JWT
 	c.JSON(http.StatusOK, TokenResponse{
